@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Et Taşıma Oyunu</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #141414;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+            background-color: #141414;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // --- AYARLAR (Pygame ile Birebir) ---
+    const WIDTH = 1920;
+    const HEIGHT = 1080;
+    const GORSEL_H = 900;
+    const ET_KAYNAK_POS = { x: WIDTH / 2, y: 990 };
+    
+    canvas.width = WIDTH;
+    canvas.height = HEIGHT;
+
+    // Ölçekleme (Ekran boyutuna uydurmak için)
+    function scaleToFit() {
+        const scale = Math.min(window.innerWidth / WIDTH, window.innerHeight / HEIGHT);
+        canvas.style.width = (WIDTH * scale) + 'px';
+        canvas.style.height = (HEIGHT * scale) + 'px';
+    }
+    window.onresize = scaleToFit;
+    scaleToFit();
+
+    // --- VARLIKLAR (Assets) ---
+    let current_index = 1;
+    let oyun_bitti = false;
+    let surukleniyor = false;
+    let mouseX = 0;
+    let mouseY = 0;
+    let kilitli_etler = [];
+    let particles = [];
+
+    const etImg = new Image();
+    etImg.src = 'img/et.png'; 
+    let etYuklendi = false;
+    etImg.onload = () => etYuklendi = true;
+
+    const bgImg = new Image();
+    function bgYukle() {
+        bgImg.src = `img/${current_index}.png`;
+    }
+    bgYukle();
+
+    // Kutuların Tanımlanması
+    const KUTULAR = {
+        1: { x: 100, y: 300, w: 300, h: 300 },
+        2: { x: 450, y: 300, w: 300, h: 300 },
+        3: { x: 800, y: 300, w: 300, h: 300 },
+        4: { x: 1150, y: 300, w: 300, h: 300 },
+        5: { x: 1500, y: 300, w: 300, h: 300 },
+        6: { x: 100, y: 600, w: 300, h: 300 },
+        7: { x: 450, y: 600, w: 300, h: 300 },
+        8: { x: 800, y: 600, w: 300, h: 300 },
+        9: { x: 1150, y: 600, w: 300, h: 300 },
+        10: { x: 1500, y: 600, w: 300, h: 300 }
+    };
+
+    // --- PARTICLE SINIFI ---
+    class Particle {
+        constructor(x, y) {
+            this.x = x;
+            this.y = y;
+            this.vx = (Math.random() - 0.5) * 16;
+            this.vy = (Math.random() - 0.5) * 16;
+            this.life = Math.floor(Math.random() * 30) + 30;
+        }
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.vy += 0.3; // Yerçekimi
+            this.life--;
+        }
+        draw() {
+            if (this.life > 0) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = "black";
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+    }
+
+    // --- KONTROLLER ---
+    function getMousePos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = WIDTH / rect.width;
+        const scaleY = HEIGHT / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+        if (oyun_bitti) return;
+        const pos = getMousePos(e);
+        // Kaynak etin üzerine tıklandı mı?
+        const dx = pos.x - ET_KAYNAK_POS.x;
+        const dy = pos.y - ET_KAYNAK_POS.y;
+        if (Math.abs(dx) < 75 && Math.abs(dy) < 75) {
+            surukleniyor = true;
+        }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        const pos = getMousePos(e);
+        mouseX = pos.x;
+        mouseY = pos.y;
+    });
+
+    window.addEventListener('mouseup', () => {
+        if (surukleniyor && !oyun_bitti) {
+            for (let i = 1; i <= current_index; i++) {
+                const kutu = KUTULAR[i];
+                const hx = kutu.x + kutu.w / 2;
+                const hy = kutu.y + kutu.h / 2;
+                const mesafe = Math.hypot(mouseX - hx, mouseY - hy);
+
+                if (mesafe < 120) {
+                    // Eğer bu kutu zaten dolmamışsa ekle
+                    const zatenVar = kilitli_etler.some(pos => pos.x === hx && pos.y === hy);
+                    if (!zatenVar) {
+                        kilitli_etler.push({ x: hx, y: hy });
+                    }
+                    break;
+                }
+            }
+
+            // Seviye kontrolü
+            if (kilitli_etler.length >= current_index) {
+                if (current_index < 10) {
+                    current_index++;
+                    kilitli_etler = [];
+                    bgYukle();
+                } else {
+                    oyun_bitti = true;
+                    patlamaBaslat();
+                }
+            }
+        }
+        surukleniyor = false;
+    });
+
+    function patlamaBaslat() {
+        for (let i = 0; i < 150; i++) {
+            particles.push(new Particle(WIDTH / 2, HEIGHT / 2));
+        }
+    }
+
+    // --- ANA DÖNGÜ (Game Loop) ---
+    function update() {
+        if (oyun_bitti) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                particles[i].update();
+                if (particles[i].life <= 0) particles.splice(i, 1);
+            }
+        }
+    }
+
+    function draw() {
+        // Arka Plan
+        ctx.fillStyle = "#141414";
+        ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+        // BG Görseli (Hata payı bırakarak)
+        try {
+            ctx.drawImage(bgImg, 0, 0, WIDTH, GORSEL_H);
+        } catch(e) {
+            ctx.fillStyle = "#28282D";
+            ctx.fillRect(0, 0, WIDTH, GORSEL_H);
+        }
+
+        // Kilitli Etler
+        kilitli_etler.forEach(pos => {
+            drawEt(pos.x, pos.y);
+        });
+
+        // Kaynak Et
+        drawEt(ET_KAYNAK_POS.x, ET_KAYNAK_POS.y);
+
+        // Sürüklenen Et
+        if (surukleniyor) {
+            drawEt(mouseX, mouseY);
+        }
+
+        // Parçacıklar
+        particles.forEach(p => p.draw());
+
+        // Aferin Yazısı
+        if (oyun_bitti) {
+            ctx.fillStyle = "black";
+            ctx.font = "bold 120px Arial";
+            ctx.textAlign = "center";
+            ctx.fillText("AFERİN!", WIDTH / 2, HEIGHT / 2);
+        }
+
+        requestAnimationFrame(() => {
+            update();
+            draw();
+        });
+    }
+
+    function drawEt(x, y) {
+        if (etYuklendi) {
+            ctx.drawImage(etImg, x - 75, y - 75, 150, 150);
+        } else {
+            // Görsel yoksa kırmızı kare çiz
+            ctx.fillStyle = "#C80000";
+            ctx.fillRect(x - 75, y - 75, 150, 150);
+        }
+    }
+
+    // Oyunu Başlat
+    draw();
+</script>
+
+</body>
+</html>
