@@ -58,13 +58,13 @@
     let particles = [];
 
     const etImg = new Image();
-    etImg.src = 'img/et.png'; 
+    etImg.src = 'et.png'; 
     let etYuklendi = false;
     etImg.onload = () => etYuklendi = true;
 
     const bgImg = new Image();
     function bgYukle() {
-        bgImg.src = `img/${current_index}.png`;
+        bgImg.src = `${current_index}.png`;
     }
     bgYukle();
 
@@ -243,4 +243,5 @@
 </script>
 
 </body>
+
 </html>
